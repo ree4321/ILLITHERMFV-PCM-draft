@@ -98,16 +98,52 @@ int main(int argc,char* argv[])
 
 			qrad = (solarrad*(1.0-albedo) + qirr + qconv)/(layers[0].solidMatrixDensity*layers[0].solidMatrixHeatCapacity);
 
-			//Define RHS [d]
-			rhsvector(d, T, x, dx, alpha, dt, qrad, xi, noOfElements);
+			//Assume new liquid fraction to be as old liquid fraction - 0th iteration
+                        fl = flnewfinal
 
-			//Solve the system of equations and store result in Tnew
-			solve(Tnew, a, b, c, d, noOfElements);
+			// Iterative process
+			while (true) {	
+				//Define RHS [d] - liquid fraction should be an input here
+				rhsvector(d, T, x, dx, alpha, dt, qrad, xi, noOfElements,fl);
+				
+				//Solve the system of equations and store result in Tnew
+				solve(Tnew, a, b, c, d, noOfElements);
+				
+				//Swap solution for 1st iteration of temperature
+				T1 = Tnew;
+	
+				//Calculate the first iteration of liquid fraction 
+				flnew = fl + under-relaxation*(update liquid fraction(layers,T))
+				if (flnew > 1) {
+	   			flnew = 1;
+				}
+				if (flnew < 0) {
+				flnew = 0;
+				}
 			
-			//Swap solution for new iteration
-			T = Tnew;
+				//Define RHS [d]  - liquid fraction should be an input here
+				rhsvector(d, T, x, dx, alpha, dt, qrad, xi, noOfElements,flnew);
+				
+				//Solve the system of equations and store result in Tnew
+				solve(Tnew, a, b, c, d, noOfElements);
+				
+				//Swap solution for 2nd iteration of temperature
+				T2 = Tnew;
 
-			update_liquid_fraction(layers, T);
+				//Update
+				if(!maxDifferenceGreaterThan(T1, T2, 1e-4)){
+				Tnewfinal = T2;
+				flnewfinal = flnew;
+				break;
+				}
+
+				else{
+				T = T2;
+				fl = flnew;
+				}
+			}
+				
+			//update_liquid_fraction(layers, T); This may not be needed here.
 			update_thermal_properties(layers);
 			assign_layer_to_element(alpha, deltaH, layers, noOfElements);
 			stiffnessmat(a, b, c, x, dx, alpha, dt, noOfElements);
